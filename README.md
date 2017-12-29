@@ -1,0 +1,2 @@
+# tesis
+kumpulan syntax tesis
