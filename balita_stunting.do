@@ -1,125 +1,230 @@
 /*-----------------------------STUNTING-----------------------------------------*/
-/*Modul penelusuran sampel di 2007 												*/
+/*Modul penelusuran sampel 12-59 bulan											*/
 /*Berapa yang masih ada di ruta; Berapa yang hilang; Kemana yang hilang         */
 /*------------------------------------------------------------------------------*/
-clear 
-capture log close 
-set more off
-
-/*---------file global - set tempat menyimpan file data-------------------------*/
-global ifls3 "D:\UIS2KK\Tesis\IFLS\3"
-global ifls4 "D:\UIS2KK\Tesis\IFLS\4"
-global ifls5 "D:\UIS2KK\Tesis\IFLS\5\hh14_all_dta"
-global main "D:\UIS2KK\Tesis\health outcomes\Run File 2\sampel 1296"
-global logfiles "D:\UIS2KK\Tesis\health outcomes\Run File 2\sampel 1296"
-capture log using "$logfiles\1.0.txt", text replace 
 /*-----------------------------------------------------------------------------*/
-
-
 ********************************************************************************
 /*------------------DIETARY DIVERSITY SCORE 2007-------------------------------*/
 use pidlink pid07 hhid07 using "$main\anthrowave45.dta"
 merge 1:m pidlink using "$ifls4\b5_fma.dta"
-drop if _merge==2
-drop _merge
-*missing data=11, matched = 4.417 sampel
+keep if _merge==3
+keep pidlink pid07 hhid07 fma01 fma02 fma03 fmatype
 
-*membentuk variabel frekuensi makan dari fma01, 11 missing
-*makan=1 --> frekuensi makan 3 kali sehari, makan=0 frekuensi makan <3 kali sehari/tidak tahu 
+*membuat variabel frekuensi makan
 ta fma01,m
 gen makan=fma01
 replace makan=1 if fma01==1 
 replace makan=0 if fma01>1&fma01!=.
 
-*membentuk variabel DDS
-gen tipe_mpasi=0
-*koding umbi-umbian
-replace tipe_mpasi=1 if fmatype=="A"
-*koding telur
-replace tipe_mpasi=2 if fmatype=="B"
-*koding daging --> ikan,daging,dan unggas
-replace tipe_mpasi=3 if fmatype=="C"|fmatype=="D"
-*koding susu
-replace tipe_mpasi=4 if fmatype=="E"
-*koding sayur2an hijau
-replace tipe_mpasi=5 if fmatype=="F"
-*koding buah sayur kaya vitamin A
-replace tipe_mpasi=6 if fmatype=="H"|fmatype=="I"|fmatype=="J"
-*koding buah lainnya
-replace tipe_mpasi=7 if fmatype=="G"
-label define tipe_mpasi 0 "tidak MPASI/Lainnya" 1 "umbi-umbian" 2 "Telur" 3 "Daging" 4 "Susu" 5 "Sayur-sayuran hijau" 6 "Buah dan sayur kaya vitamin A" 7 "Buah Lainnya"
-label value tipe_mpasi "tipe_mpasi"
+*membuat variabel DDS
+gen fmatype2=fmatype
+replace fmatype2="K" if fmatype==""
+replace fma03=0 if fma03==.
+encode fmatype2,gen(jenismakanan)
+drop fmatype fmatype2
+reshape wide fma02 fma03,i(pidlink) j(jenismakanan) 
 
-gen frek_makan=fma02
-replace frek_makan=fma03 if fma02==1
-replace frek_makan=0 if fma02==3|fma02==9
-*untuk yang belum MPASI ditulis 0
-replace frek_makan=0 if fma01==96&fma02==.
-bysort hhid07 pid07 tipe_mpasi:egen diversity=max(frek_makan)
-bysort hhid07 pid07 tipe_mpasi : gen dup_tipe=cond(_N==1,0,_n)
-drop if dup_tipe>1
-drop dup_tipe
+*1=A(umbi-umbian),2=B(telur),3=C(daging),4=D(daging),5=E(susu),
+*6=F(sayuran hijau),7=G(buah lainnya),8=H(buah sayur vitA),9=I(buah sayur vitA),10=J(buah sayur vitA)
+drop fma0211 fma0311
 
-bysort hhid07 pid07 : gen div_balita=sum(diversity)
+gen n_umbi=fma031
+replace n_umbi=0 if n_umbi==.
 
-*bysort hhid07 pid07 : egen dds = max(div_balita) if diversity!=.
-drop div_balita
+gen n_telur=fma032
+replace n_umbi=0 if n_telur==.
 
-*variabel frekuensi makan dalam hari untuk 7 jenis tipe makanan
-gen frek_umbi=0
-replace frek_umbi=diversity if tipe_mpasi==1
+gen n_daging=fma033
+replace n_daging=fma034 if fma034>fma033
+replace n_daging=0 if n_daging==.
 
-gen frek_telur=0
-replace frek_telur=diversity if tipe_mpasi==2
+gen n_susu=fma035
+replace n_susu=0 if n_susu==.
 
-gen frek_daging=0
-replace frek_daging=diversity if tipe_mpasi==3
+gen n_sayur=fma036
+replace n_sayur=0 if n_sayur==.
 
-gen frek_susu=0
-replace frek_susu = diversity if tipe_mpasi==4
+gen n_buahlain=fma037
+replace n_buahlain=0 if n_buahlain==.
 
-gen frek_sayur=0
-replace frek_sayur=diversity if tipe_mpasi==5
+*ini untuk ngitung DDS model 2 (6 grup makanan,umbi,daging,susu,telur,buah sayur A,buah dan sayur)
+gen n_buahsayur=fma036
+replace n_buahsayur=fma037 if fma037>fma036
+replace n_buahsayur=0 if n_buahsayur==.
 
-gen frek_buahsayurA=0
-replace frek_buahsayurA=diversity if tipe_mpasi==6
+gen n_buahsayurA=fma038
+replace n_buahsayurA=fma039 if (fma039>fma038)&(fma039>fma0310)
+replace n_buahsayurA=fma0310 if (fma0310>fma038)&(fma0310>fma038)
+replace n_buahsayurA=0 if n_buahsayurA==.
 
-gen frek_buah=0
-replace frek_buah=diversity if tipe_mpasi==7
+gen dds=n_umbi+n_telur+n_daging+n_susu+n_sayur+n_buahlain+n_buahsayurA
+gen dds2=n_umbi+n_telur+n_daging+n_susu+n_buahsayur+n_buahsayurA
 
-bysort hhid07 pid07: egen fre_umbi=max(frek_umbi)
-bysort hhid07 pid07: egen fre_telur=max(frek_telur)
-bysort hhid07 pid07: egen fre_daging=max(frek_daging)
-bysort hhid07 pid07: egen fre_susu=max(frek_susu)
-bysort hhid07 pid07: egen fre_sayur=max(frek_sayur)
-bysort hhid07 pid07: egen fre_buahsayurA=max(frek_buahsayurA)
-bysort hhid07 pid07: egen fre_buah=max(frek_buah)
+gen dds3=0
+replace dds3=dds3+1 if n_umbi>2
+replace dds3=dds3+1 if n_telur>2
+replace dds3=dds3+1 if n_daging>2
+replace dds3=dds3+1 if n_susu>2
+replace dds3=dds3+1 if n_sayur>2
+replace dds3=dds3+1 if n_buahlain>2
+replace dds3=dds3+1 if n_buahsayurA>2
 
-gen dds=fre_umbi+fre_telur+fre_daging+fre_susu+fre_sayur+fre_buahsayurA+fre_buah
+gen dds4=0
+replace dds4=dds4+1 if n_umbi>2
+replace dds4=dds4+1 if n_telur>2
+replace dds4=dds4+1 if n_daging>2
+replace dds4=dds4+1 if n_susu>2
+replace dds4=dds4+1 if n_buahsayur>2
+replace dds4=dds4+1 if n_buahsayurA>2
 
-*buang data duplikat
-bysort hhid07 pid07 : gen dup_id=cond(_N==1,0,_n)
-drop if dup_id>1
-
-*membuat variabel DDS menjadi 3 kategori
+gen fvs=fma031+fma032+fma033+fma034+fma035+fma036+fma037+fma038+fma039+fma0310
 xtile tertile_dds = dds,nquantile(3)
-keep hhid07 pid07 pidlink dds fre_umbi fre_telur fre_daging fre_susu fre_sayur fre_buahsayurA fre_buah makan tertile_dds
+xtile tertile_dds2 = dds2,nquantile(3)
+xtile tertile_dds3 = dds3,nquantile(3)
+xtile tertile_dds4 = dds4,nquantile(3)
+xtile tertile_fvs = fvs,nquantile(3)
+keep pidlink makan pid07 hhid07 dds dds2 dds3 dds4 fvs n_umbi n_telur n_daging n_susu n_sayur n_buahlain n_buahsayurA tertile_dds tertile_dds2 tertile_dds3 tertile_dds4
 
 /*--------------------------LABELLING DDS--------------------------------------*/
-la var dds "Dietary diversity score"
+la var dds "Dietary diversity score (7 Grup)"
+la var dds2 "Dietary diversity score (6 Grup)"
+la var dds3 "Dietary diversity score cutpoint 3 (7 Grup)"
+la var dds4 "Dietary diversity score cutpoint 3 (6 Grup)"
+la var fvs "Food Variety Score"
 la var makan "Frekuensi Makan"
 la def makan 1 "3 kali sehari" 0 "<3 kali sehari"
 la val makan makan
-la var fre_umbi "Frekuensi umbi-umbian"
-la var fre_telur "Frekuensi telur"
-la var fre_daging "Frekuensi daging"
-la var fre_susu "Frekuensi susu"
-la var fre_sayur "Frekuensi sayur"
-la var fre_buahsayurA "Frekuensi buah dan sayur mengandung vitamin A"
-la var fre_buah "Frekuensi buah"
+la var n_umbi "Frekuensi umbi-umbian"
+la var n_telur "Frekuensi telur"
+la var n_daging "Frekuensi daging"
+la var n_susu "Frekuensi susu"
+la var n_sayur "Frekuensi sayur"
+la var n_buahsayurA "Frekuensi buah dan sayur mengandung vitamin A"
+la var n_buahlain "Frekuensi buah"
 
 tempfile balita_fma07
 save "`balita_fma07'",replace
+/*-----------------------------------------------------------------------------*/
+********************************************************************************
+
+
+********************************************************************************
+/*----------------------------BUKU 4 ASI--------------------------------------*/
+use "$ifls4\b4_ch1"
+rename ch27 pidanak
+rename pidlink pidlinkibu
+drop if mi(pidanak)
+bysort hhid07 pidanak: gen id=cond(_N==1,0,_n)
+drop if id>1
+drop id
+tempfile chanak
+save "`chanak'",replace
+
+use pidlink pid07 hhid07 umur_bulan_07 using "$main\anthrowave45.dta" 
+rename pidlink pidlinkanak 
+rename pid07 pidanak
+
+merge 1:1 hhid07 pidanak using "`chanak'"
+drop if _merge==2
+*ada 59 observasi yang tidak ada datanya di CH
+*drop _merge
+
+gen durasi_ASI = umur_bulan if ch24ex==96 
+
+replace durasi_ASI = ch24e if ch24ex==5
+replace durasi_ASI=umur_bulan if umur_bulan<durasi_ASI&durasi_ASI!=.
+replace durasi_ASI=0 if durasi_ASI==.&ch24a==3
+replace durasi_ASI=ch24c if durasi_ASI==.
+gen durasi_ASI2=durasi_ASI*durasi_ASI
+keep hhid07 pidanak durasi_ASI durasi_ASI2
+rename pidanak pid07
+/*--------------------------LABELLING DDS--------------------------------------*/
+la var durasi_ASI "Durasi Menyusui"
+la var durasi_ASI2 "Kuadrat Durasi Menyusui"
+
+tempfile asi
+save "`asi'",replace
+/*-----------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------*/
+********************************************************************************
+
+
+
+********************************************************************************
+/*-------------------------BUKU 5 IMUNISASI------------------------------------*/
+use pidlink pid07 hhid07 using "$main\anthrowave45.dta"
+merge 1:1 pidlink using "$ifls4\b5_rja3.dta"
+*ada 8 yg ga matched
+keep if _merge==3
+drop _merge
+
+*koding BCG
+gen bcg=rja28adb
+replace bcg=1 if rja28adb>0|rja30a==1
+replace bcg=0 if rja28adb==0|rja30a==3|rja30a==8
+
+*koding campak
+gen campak=rja28adk
+replace campak=1 if rja28adk>0|rja30d==1
+replace campak=0 if rja28adk==0|rja30d==3|rja30d==8
+
+*koding polio
+gen polio=.
+*Polio 0
+replace polio=1 if rja28adc>0
+*Polio 1
+replace polio=polio+1 if rja28add>0
+*Polio 2
+replace polio=polio+1 if rja28ade>0
+*Polio 3
+replace polio=polio+1 if rja28adg>0
+*Polio 4
+replace polio=polio+1 if rja28adf>0
+*dianggap lengkap jika 5 kali menerima vaksin polio
+*Probing polio
+replace polio=rja30bn if mi(rja28add)|mi(rja28ade)|mi(rja28adf)|mi(rja28adg)
+replace polio=0 if mi(polio)|polio==98
+replace polio=5 if polio>5&polio!=98
+
+*koding hepatitis B
+gen hepB=.
+*hepB 1
+replace hepB=1 if rja28adl>0
+*hepB 2
+replace hepB=hepB+1 if rja28adm>0
+*hepB 3
+replace hepB=hepB+1 if rja28adn>0
+*Probing HepB
+replace hepB=rja30en if mi(rja28adl)|mi(rja28adm)|mi(rja28adn)
+replace hepB=0 if mi(hepB)|hepB==98
+replace hepB=3 if hepB>3
+
+*koding DPT
+gen dpt=.
+*DPT 1
+replace dpt=1 if rja28adh>0
+*DPT 2
+replace dpt=dpt+1 if rja28adi>0
+*DPT 3
+replace dpt=dpt+1 if rja28adj>0
+*Probing DPT
+replace dpt=rja30en if mi(rja28adh)|mi(rja28adi)|mi(rja28adj)
+replace dpt=0 if mi(dpt)|dpt==98
+replace dpt=3 if dpt>3
+
+gen imun=0
+replace imun=1 if campak==1&bcg==1&polio==5&hepB==3&dpt==3
+keep pidlink pid07 hhid07 imun
+/*--------------------------LABELLING IMUN-------------------------------------*/
+
+la var imun "Status Imunisasi Dasar"
+la def imun 1 "Lengkap" 0 "Tidak Lengkap"
+la val imun imun
+
+/*-----------------------------------------------------------------------------*/
+
+tempfile imunisasi
+save "`imunisasi'",replace
 /*-----------------------------------------------------------------------------*/
 ********************************************************************************
 
@@ -304,9 +409,101 @@ save "`hh_extended'"
 /*-----------------------------------------------------------------------------*/
 ********************************************************************************
 
- 
+********************************************************************************
 /*---------------------------BANTUAN PEMERINTAH--------------------------------*/
+*Membuat variabel pernah menerima bantuan BLT, pernah menerima bantuan PKH,
+*diambil dari buku 1 (b1_ks1) dan buku 2 (b2_kr)
+
+use hhid07 using "$main\anthrowave45.dta" 
+bysort hhid07:gen id=cond(_N==1,0,_n)
+drop if id>1
+drop id
+
+merge 1:m hhid07 using "$ifls4\b1_ksr1"
+*2 ruta tidak matched
+keep if _merge==3
+
+encode ksr3type,gen(tipebantuan)
+drop _merge version module _merge ksr3type
+reshape wide ksr17 ksr18m ksr18y ksr19 ksr20x ksr21x ksr22m ksr22y ksr23x ksr20 ksr21 ksr23,i(hhid07) j(tipebantuan)
+
+gen pernah_BLT=ksr171
+*ada 1 yg missing value (9) --> dikoding tidak pernah BLT
+recode pernah_BLT(3 9 =0)
+
+gen pernah_PKH=ksr172
+*ada 1 yg missing value (9) --> dikoding tidak pernah BLT
+recode pernah_PKH (3 6 9=0)
+
+gen pernah_BLTsetahun=ksr21x1
+recode pernah_BLTsetahun (6 8 9 . = 0)
+
+gen pernah_PKHsetahun=ksr21x2
+recode pernah_PKHsetahun (6 9 . = 0)
+
+gen pernah_subsidi=1 if pernah_BLT==1|pernah_PKH==1
+replace pernah_subsidi=0 if pernah_subsidi==.
+
+gen pernah_subsidisetahun=1 if pernah_BLTsetahun==1|pernah_PKHsetahun==1
+replace pernah_subsidisetahun=0 if pernah_subsidisetahun==.
+keep hhid07 pernah_BLT pernah_PKH pernah_BLTsetahun pernah_PKHsetahun pernah_subsidi pernah_subsidisetahun
+tempfile bantuan1
+save "`bantuan1'"
+*-------------------------------------------------------------------------------*
+use hhid07 using "$main\anthrowave45.dta" 
+bysort hhid07:gen id=cond(_N==1,0,_n)
+drop if id>1
+drop id
+
+merge 1:1 hhid07 using "$ifls4\b2_kr"
+*2 ruta tidak matched
+keep if _merge==3
+
+gen kartu_sehat=kr26
+recode kartu_sehat (3 9 = 0)
+
+gen kartu_subsidi=kr27b
+recode kartu_subsidi (3 8 = 0)
+keep hhid07 kartu_sehat kartu_subsidi
+merge 1:1 hhid07 using "`bantuan1'"
+drop _merge
+/*--------------------------LABELLING -----------------------------------------*/
+la var pernah_BLT "Pernah Menerima BLT"
+la def pernah_BLT 0 "Tidak" 1 "Pernah"
+la val pernah_BLT pernah_BLT
+
+la var pernah_PKH "Pernah Menerima PKH"
+la def pernah_PKH 0 "Tidak" 1 "Pernah"
+la val pernah_PKH pernah_PKH
+
+la var pernah_PKHsetahun "Pernah Menerima PKH Setahun terakhir"
+la def pernah_PKHsetahun 0 "Tidak" 1 "Pernah"
+la val pernah_PKHsetahun pernah_PKHsetahun
+
+la var pernah_BLTsetahun "Pernah Menerima BLT Setahun terakhir"
+la def pernah_BLTsetahun 0 "Tidak" 1 "Pernah"
+la val pernah_BLTsetahun pernah_BLTsetahun
+
+la var pernah_subsidi "Pernah Menerima Bantuan Subsidi"
+la def pernah_subsidi 0 "Tidak" 1 "Pernah"
+la val pernah_subsidi pernah_subsidi
+
+la var pernah_subsidisetahun "Pernah Menerima Bantuan Subsidi Setahun Terakhir"
+la def pernah_subsidisetahun 0 "Tidak" 1 "Pernah"
+la val pernah_subsidisetahun pernah_subsidisetahun
+
+la var kartu_sehat "Memiliki Kartu Jaminan Kesehatan Untuk Org Miskin (ASKESKIN/Jamkesmas/BPJS/JKN)"
+la def kartu_sehat 0 "Tidak" 1 "Punya"
+la val kartu_sehat kartu_sehat
+
+la var kartu_subsidi "Memiliki Kartu PKPS/BBM/BLT"
+la def kartu_subsidi 0 "Tidak" 1 "Punya"
+la val kartu_subsidi kartu_subsidi
 /*-----------------------------------------------------------------------------*/
+tempfile bantuan
+save "`bantuan'"
+/*-----------------------------------------------------------------------------*/
+********************************************************************************
 
 /*----------------------STATUS SANITASI&MINUM----------------------------------*/
 use hhid07 using "$main\anthrowave45.dta" 
@@ -350,8 +547,8 @@ keep if _merge==3
 drop _merge
 
 keep sc010707 sc020707 sc030707 hhid07 sc05
-rename sc010707 kd_prov07
-rename sc020707 kd_kab07
+rename sc010707 kd_prov
+rename sc020707 kd_kab
 rename sc030707 kdkec
 la var sc05 "Perkotaan/Perdesaan"
 la def sc05 1 "Perkotaan" 0 "Perdesaan"
@@ -455,6 +652,7 @@ gen cap_minyaklemak=exp_minyaklemak/hh_size
 gen cap_animalsource = animal_foods/hh_size
 gen cap_plantsource = plant_foods/hh_size
 gen cap_grainsource = grain_foods/hh_size
+gen cap_foodexp = hh_food_exp/hh_size
 
 *mengambil data ruta aja
 bysort hhid07:gen id=cond(_N==1,0,_n)
@@ -472,9 +670,15 @@ xtile kuin_minyaklemak = cap_minyaklemak,n(5)
 xtile kuin_animal = cap_animalsource,n(5)
 xtile kuin_plant = cap_plantsource,n(5)
 xtile kuin_grain = cap_grainsource,n(5)
+xtile kuin_foodexp = cap_foodexp,n(5)
 
 *generate variabel share pengeluaran perjenis terhadap pengeluaran makanan
-
+gen sharecap_animal = (cap_animalsource/cap_foodexp)*100
+gen sharecap_plant = (cap_plantsource/cap_foodexp)*100
+gen sharecap_grain = (cap_grainsource/cap_foodexp)*100
+gen sharecap_susu = (cap_susu/cap_foodexp)*100
+gen sharecap_telur = (cap_telur/cap_foodexp)*100
+gen sharecap_daging = (cap_daging/cap_foodexp)*100
 
 la var exp_bijian "Pengeluaran Biji-Bijian,Akar-Akaran,dan Umbi-Umbian"
 la var exp_daging "Pengeluaran Daging-Dagingan"
@@ -508,6 +712,10 @@ la var cap_grainsource "Pengeluaran per kapita beras dll"
 la var share_animalfoods "% Pengeluaran animal foods source terhadap pengeluaran makanan"
 la var share_plantfoods "% Pengeluaran plant foods source terhadap pengeluaran makanan"
 la var share_grainfoods "% Pengeluaran staple food terhadap pengeluaran makanan"
+la var sharecap_animal "% Pengeluaran Per Kapita Animal Foods Source "
+la var sharecap_plant "% Pengeluaran Per Kapita Plant Foods Source "
+la var sharecap_grain "% Pengeluaran Per Kapita Grain Foods Source "
+
 *keep hhid07 kuin_grain kuin_animal kuin_plant kuin_minyaklemak kuin_susu kuin_telur kuin_kacang kuin_buahsayur kuin_daging kuin_bijian cap_minyaklemak cap_susu cap_telur cap_kacang cap_buahsayur cap_daging cap_bijian hh_size exp_minyaklemak exp_susu exp_telur exp_kacang exp_buahsayur exp_daging exp_bijian plant_foods animal_foods cap_plantsource cap_animalsource cap_grainsource 
 drop ks1type ks02x ks03x ks02 ks03 version module jenis sum_jenis exp_jenis
 
@@ -525,9 +733,15 @@ merge 1:1 hhid07 using "`hh_wilayah'"
 keep if _merge==3
 drop _merge
 
-merge m:1 kd_prov07 kd_kab07 using "$main\makro07"
+merge m:1 kd_prov kd_kab using "$main\makro07"
 keep if _merge==3
 drop _merge
+
+gen group_imun=0 if imun_lengkap>0&imun_lengkap<=50.0
+replace group_imun=1 if imun_lengkap>50.0
+
+gen group_pnol=0 if pnol>0&pnol<=20.0
+replace group_pnol=1 if pnol>20.0
 
 tempfile hh_makro
 save "`hh_makro'"
@@ -541,6 +755,12 @@ drop _merge
 
 merge 1:1 pidlink using "`us_fma_maa'"
 *keep if _merge==3
+drop _merge
+
+merge 1:1 pidlink using "`imunisasi'"
+drop _merge
+
+merge 1:1 hhid07 pid07 using "`asi'"
 drop _merge
 
 merge 1:1 pidlink using "`us_kerja'"
@@ -569,6 +789,9 @@ drop _merge
 
 merge m:1 hhid07 using "`hh_makro'"
 *keep if _merge==3
+drop _merge
+
+merge m:1 hhid07 using "`bantuan'"
 drop _merge
 /*----------------------------------------------------------------------------*/
 
