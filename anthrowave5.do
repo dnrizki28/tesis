@@ -1,18 +1,7 @@
 /*-----------------------------STUNTING-----------------------------------------*/
-/*Modul hitung antropometri di 2014 											*/
-/*																		        */
+/*Modul penelusuran sampel 12-59 bulan											*/
+/*Berapa yang masih ada di ruta; Berapa yang hilang; Kemana yang hilang         */
 /*------------------------------------------------------------------------------*/
-clear 
-capture log close 
-set more off
-
-/*---------file global - set tempat menyimpan file data-------------------------*/
-global ifls3 "D:\UIS2KK\Tesis\IFLS\3"
-global ifls4 "D:\UIS2KK\Tesis\IFLS\4"
-global ifls5 "D:\UIS2KK\Tesis\IFLS\5\hh14_all_dta"
-global main "D:\UIS2KK\Tesis\health outcomes\Run File 2\sampel 1296"
-global logfiles "D:\UIS2KK\Tesis\health outcomes\Run File 2\sampel 1296"
-capture log using "$logfiles\1.0.txt", text replace 
 /*-----------------------------------------------------------------------------*/
 use hhid14 pid14 pidlink using "$main\id_sampel0714"
 merge 1:1 hhid14 pid14 using "$ifls5/bus_us"
@@ -24,6 +13,7 @@ keep hhid14 pid14 pidlink us04 us06
 merge 1:1 pidlink using "$main\sample_base"
 keep if _merge==3
 keep hhid14 pid14 pidlink sex us04 us06 ar08yr ar08mth
+drop if us04==.
 tempfile uswave5
 save "`uswave5'"
 *jumlah sampel : 4964
@@ -74,7 +64,7 @@ use "D:\UIS2KK\Tesis\health outcomes\who2007_stata\IFLS5_z.dta"
 gen stunting=0
 replace stunting=1 if _zhfa<-2.0
 gen haz=_zhfa
-keep hhid14 pid14 pidlink sex umur_bulan haz stunting us04
+keep hhid14 pid14 pidlink sex umur_bulan haz stunting us04 age
 
 gen severe_stunting=0
 replace severe_stunting=1 if haz<-2&haz>-3
@@ -83,4 +73,15 @@ replace severe_stunting=2 if haz<=-3
 tempfile anthro_5
 save "`anthro_5'",replace
 /*-----------------------------------------------------------------------------*/
+********************************************************************************
+la var stunting "Status Nutrisi"
+la def stunting 0 "Normal" 1 "Stunting"
+la val stunting stunting
+
+la var severe_stunting "Status Nutrisi"
+la def severe_stunting 0 "Normal" 1 "Moderate Stunting" 2 "Severe Stunting"
+la val severe_stunting severe_stunting
+
+la var haz "Height for Age Z-Score"
+********************************************************************************
 save "$main\anthrowave5",replace
